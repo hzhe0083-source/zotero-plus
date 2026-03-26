@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
+    "build:addon": "npm run build -w zotero-plus-bridge-addon",
     "test": "npm --workspaces --if-present test"
   }
 }
-

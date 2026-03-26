@@ -80,6 +80,56 @@ Zotero-Plus 当前暴露的 MCP 工具不再依赖额外的 Zotero MCP 插件。
 npm install
 ```
 
+## Install The Addon
+
+1. Build the Zotero addon package:
+
+```bash
+npm run build:addon
+```
+
+2. This generates:
+
+```text
+packages/zotero-plus-bridge-addon/release/zotero-plus-bridge-0.2.0.xpi
+```
+
+3. In Zotero:
+   Open `Tools -> Plugins`
+4. Click the gear icon, choose `Install Plugin From File...`
+5. Select the generated `.xpi`
+6. Restart Zotero
+7. Verify the bridge is running:
+
+```bash
+curl http://127.0.0.1:23121/health
+```
+
+## 安装 Zotero Plus Bridge 插件
+
+1. 先构建 Zotero 插件包：
+
+```bash
+npm run build:addon
+```
+
+2. 构建后会生成：
+
+```text
+packages/zotero-plus-bridge-addon/release/zotero-plus-bridge-0.2.0.xpi
+```
+
+3. 在 Zotero 中打开：
+   `工具 -> 插件`
+4. 点击右上角齿轮，选择 `从文件安装插件`
+5. 选中生成的 `.xpi`
+6. 重启 Zotero
+7. 用下面命令确认 bridge 已启动：
+
+```bash
+curl http://127.0.0.1:23121/health
+```
+
 ## Test
 
 ```bash
@@ -106,6 +156,10 @@ Still required locally:
 - Zotero
 - Zotero local API
 - Zotero Plus bridge addon
+
+If users install the addon and keep the default ports, they should not need to edit any machine-specific paths.
+
+如果用户装好了插件并使用默认端口，就不需要再改任何机器相关路径。
 
 也就是说：
 

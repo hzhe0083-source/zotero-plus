@@ -1,0 +1,16 @@
+{
+  "manifest_version": 2,
+  "name": "Zotero Plus Bridge",
+  "version": "0.2.0",
+  "description": "Local HTTP bridge for Zotero Plus write workflows",
+  "homepage_url": "https://github.com/hzhe0083-source/zotero-plus",
+  "author": "Ryan",
+  "applications": {
+    "zotero": {
+      "id": "zotero-plus-bridge@local.ryan",
+      "strict_min_version": "6.999",
+      "strict_max_version": "9.*"
+    }
+  }
+}
+
