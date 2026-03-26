@@ -1,7 +1,7 @@
 {
   "name": "zotero-plus-bridge-addon",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Zotero addon source for the Zotero Plus local HTTP bridge",
   "scripts": {
     "build": "node scripts/build-xpi.mjs"
