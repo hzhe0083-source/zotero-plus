@@ -1,0 +1,12 @@
+{
+  "name": "zotero-plus",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "npm --workspaces --if-present test"
+  }
+}
+

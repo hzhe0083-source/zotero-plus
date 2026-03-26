@@ -1,0 +1,16 @@
+{
+  "name": "zotero-plus-mcp",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Standalone MCP server for Zotero ingest and metadata workflows",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.4",
+    "@zotero-plus/bridge": "file:../zotero-bridge"
+  }
+}
+
