@@ -4,27 +4,6 @@ import path from 'node:path';
 import { buildChildNoteTemplate, ensurePdfPath } from './lib.js';
 import { ZoteroLocalApiClient } from '@zotero-plus/bridge';
 
-function joinTextContent(result) {
-  return (result?.content || [])
-    .filter((entry) => entry?.type === 'text')
-    .map((entry) => entry.text)
-    .join('\n')
-    .trim();
-}
-
-function parseJsonText(result) {
-  const text = joinTextContent(result);
-  if (!text) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
-}
-
 function inferPdfFilename(url) {
   try {
     const parsed = new URL(url);
@@ -37,115 +16,20 @@ function inferPdfFilename(url) {
 
 export class ZoteroPlusService {
   constructor({
-    mcpUrl = 'http://127.0.0.1:23120/mcp',
     fetchImpl = fetch,
     downloadDir = path.join(tmpdir(), 'zotero-plus-downloads'),
     localClient = null
   } = {}) {
-    this.mcpUrl = mcpUrl.replace(/\/$/, '');
     this.fetch = fetchImpl;
     this.downloadDir = downloadDir;
-    this.sessionId = null;
-    this.requestId = 1;
-    this.localClient = localClient || new ZoteroLocalApiClient({
-      fetchImpl,
-      mcpBaseUrl: this.mcpUrl.replace(/\/mcp$/, '')
-    });
-  }
-
-  async _ensureSession() {
-    if (this.sessionId) {
-      return this.sessionId;
-    }
-
-    const initPayload = {
-      jsonrpc: '2.0',
-      id: this.requestId++,
-      method: 'initialize',
-      params: {
-        protocolVersion: '2024-11-05',
-        capabilities: {},
-        clientInfo: {
-          name: 'zotero-plus-mcp',
-          version: '0.2.0'
-        }
-      }
-    };
-
-    const initRes = await this.fetch(this.mcpUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(initPayload)
-    });
-
-    if (!initRes.ok) {
-      const text = await initRes.text();
-      throw new Error(`Failed to initialize Zotero MCP session: ${initRes.status} ${text}`);
-    }
-
-    this.sessionId = initRes.headers.get('Mcp-Session-Id');
-    if (!this.sessionId) {
-      throw new Error('Zotero MCP did not return Mcp-Session-Id');
-    }
-
-    const notifyPayload = {
-      jsonrpc: '2.0',
-      method: 'notifications/initialized',
-      params: {}
-    };
-
-    await this.fetch(this.mcpUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Mcp-Session-Id': this.sessionId
-      },
-      body: JSON.stringify(notifyPayload)
-    });
-
-    return this.sessionId;
-  }
-
-  async _callTool(name, args = {}) {
-    const sessionId = await this._ensureSession();
-    const payload = {
-      jsonrpc: '2.0',
-      id: this.requestId++,
-      method: 'tools/call',
-      params: {
-        name,
-        arguments: args
-      }
-    };
-
-    const res = await this.fetch(this.mcpUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Mcp-Session-Id': sessionId
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const text = await res.text();
-    if (!res.ok) {
-      throw new Error(`Zotero MCP tool ${name} failed: ${res.status} ${text}`);
-    }
-
-    const json = JSON.parse(text);
-    if (json.error) {
-      throw new Error(`Zotero MCP tool ${name} error: ${json.error.message}`);
-    }
-
-    return json.result;
+    this.localClient = localClient || new ZoteroLocalApiClient({ fetchImpl });
   }
 
   async getItem(itemKey) {
     if (!itemKey) {
       throw new Error('itemKey is required');
     }
-
-    return this._callTool('get_item_details', { itemKey, mode: 'complete' });
+    return this.localClient.getItem(itemKey);
   }
 
   async updateItemFields(itemKey, fields, creators) {
@@ -156,17 +40,12 @@ export class ZoteroPlusService {
       throw new Error('fields must be an object');
     }
 
-    const args = { itemKey, fields };
-    if (Array.isArray(creators) && creators.length > 0) {
-      args.creators = creators;
-    }
-
-    const result = await this._callTool('write_metadata', args);
+    const result = await this.localClient.updateItemFields(itemKey, fields, creators || []);
     return {
       ok: true,
       itemKey,
       updatedFields: Object.keys(fields),
-      response: parseJsonText(result) ?? joinTextContent(result)
+      response: result
     };
   }
 
@@ -175,8 +54,7 @@ export class ZoteroPlusService {
       throw new Error('itemType is required');
     }
 
-    const result = await this._callTool('write_item', {
-      action: 'create',
+    const result = await this.localClient.createItemWithMetadata({
       itemType,
       fields,
       creators,
@@ -187,7 +65,7 @@ export class ZoteroPlusService {
     return {
       ok: true,
       itemType,
-      response: parseJsonText(result) ?? joinTextContent(result)
+      response: result
     };
   }
 
@@ -197,8 +75,7 @@ export class ZoteroPlusService {
     }
 
     const content = buildChildNoteTemplate(item);
-    const result = await this._callTool('write_note', {
-      action: 'create',
+    const result = await this.localClient.createChildNote({
       parentKey,
       content,
       tags
@@ -208,7 +85,7 @@ export class ZoteroPlusService {
       ok: true,
       parentKey,
       content,
-      response: parseJsonText(result) ?? joinTextContent(result)
+      response: result
     };
   }
 

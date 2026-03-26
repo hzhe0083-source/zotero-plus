@@ -1,12 +1,12 @@
 import { createServer } from "node:http";
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { existsSync, statSync } from "node:fs";
+import { resolve } from "node:path";
 
 const DEFAULT_BASE_URL = process.env.ZOTERO_API_BASE_URL || "http://127.0.0.1:23119/api";
 const DEFAULT_LIBRARY = process.env.ZOTERO_LIBRARY || "user";
 const DEFAULT_LIBRARY_ID = process.env.ZOTERO_LIBRARY_ID || "0";
 const API_KEY = process.env.ZOTERO_API_KEY || "";
-const DEFAULT_MCP_BASE_URL = process.env.ZOTERO_MCP_BASE_URL || "http://127.0.0.1:23120";
+const DEFAULT_BRIDGE_BASE_URL = process.env.ZOTERO_PLUS_BRIDGE_URL || "http://127.0.0.1:23121";
 
 export function buildCitationKey({ authors = [], year = "n.d.", title = "Untitled" }) {
   const firstAuthor = authors[0] || "Unknown";
@@ -57,14 +57,14 @@ export class ZoteroLocalApiClient {
     library = DEFAULT_LIBRARY,
     libraryId = DEFAULT_LIBRARY_ID,
     apiKey = API_KEY,
-    mcpBaseUrl = DEFAULT_MCP_BASE_URL,
+    bridgeBaseUrl = DEFAULT_BRIDGE_BASE_URL,
     fetchImpl = fetch
   } = {}) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
     this.library = library;
     this.libraryId = libraryId;
     this.apiKey = apiKey;
-    this.mcpBaseUrl = mcpBaseUrl.replace(/\/$/, "");
+    this.bridgeBaseUrl = bridgeBaseUrl.replace(/\/$/, "");
     this.fetchImpl = fetchImpl;
   }
 
@@ -79,45 +79,14 @@ export class ZoteroLocalApiClient {
     return this.parseJsonResponse(response, `Failed to load item ${itemKey}`);
   }
 
-  async getLibraryVersion() {
-    const response = await this.fetchImpl(`${this.baseUrl}/${this.library}s/${this.libraryId}/items?limit=1`, {
-      headers: this.headers()
-    });
-    await this.parseJsonResponse(response, "Failed to load library version");
-    const versionHeader = response.headers.get("Last-Modified-Version");
-    const version = Number(versionHeader);
-    if (!Number.isFinite(version)) {
-      throw new Error("Missing Last-Modified-Version header from local Zotero API");
+  async updateItemFields(itemKey, fields, creators = []) {
+    if (!itemKey) {
+      throw new Error("itemKey is required");
     }
-    return version;
-  }
-
-  async updateItemFields(itemKey, fields) {
-    const existing = await this.getItem(itemKey);
-    const version = existing.version ?? existing.data?.version;
-    if (version == null) {
-      throw new Error(`Missing item version for ${itemKey}`);
+    if (!fields || typeof fields !== "object" || Array.isArray(fields)) {
+      throw new Error("fields must be an object");
     }
-
-    const data = { ...(existing.data || {}) };
-    for (const [key, value] of Object.entries(fields || {})) {
-      if (value !== undefined) {
-        data[key] = value;
-      }
-    }
-
-    const response = await this.fetchImpl(this.itemUrl(itemKey), {
-      method: "PATCH",
-      headers: {
-        ...this.headers(),
-        "Content-Type": "application/json",
-        "If-Unmodified-Since-Version": String(version)
-      },
-      body: JSON.stringify([data])
-    });
-
-    const parsed = await this.parseJsonResponse(response, `Failed to update item ${itemKey}`);
-    return { itemKey, version, result: parsed };
+    return this.postBridge("/updateItemFields", { itemKey, fields, creators }, `Failed to update item ${itemKey}`);
   }
 
   async importAttachment(filePath, parentKey, title = "Full Text PDF") {
@@ -129,178 +98,49 @@ export class ZoteroLocalApiClient {
     if (!stats.isFile()) {
       throw new Error(`Attachment path is not a file: ${absPath}`);
     }
-    const parentItem = await this.getItem(parentKey);
-    const filename = basename(absPath);
-    const libraryVersion = await this.getLibraryVersion();
-    const sourceUrl = parentItem.data?.url || parentItem.url || `zotero://select/library/items/${parentKey}`;
-    const sessionID = `zotero-mcp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-
-    const connectorResult = await this.saveStandaloneAttachment({
+    return this.postBridge("/importAttachment", {
       filePath: absPath,
-      sessionID,
-      title,
-      url: sourceUrl
-    });
-
-    const imported = await this.waitForImportedAttachment({
-      sinceVersion: libraryVersion,
-      filename,
-      sourceUrl,
       parentKey,
-      parentTitle: parentItem.data?.title || parentItem.title || ""
-    });
+      title
+    }, `Failed to import attachment for ${parentKey}`);
+  }
 
-    await this.reparentAttachment(imported.attachmentKey, parentKey);
-
-    if (imported.duplicateParentKeys.length && parentItem.data?.collections?.length) {
-      for (const collectionKey of parentItem.data.collections) {
-        await this.removeItemsFromCollection(collectionKey, imported.duplicateParentKeys);
-      }
+  async createItemWithMetadata({ itemType, fields = {}, creators = [], tags = [], attachmentKeys = [] }) {
+    if (!itemType) {
+      throw new Error("itemType is required");
     }
+    return this.postBridge("/createItem", {
+      itemType,
+      fields,
+      creators,
+      tags,
+      attachmentKeys
+    }, `Failed to create item of type ${itemType}`);
+  }
 
-    const verifiedAttachment = await this.getItem(imported.attachmentKey);
-    if (verifiedAttachment.data?.parentItem !== parentKey) {
-      throw new Error(`Attachment ${imported.attachmentKey} was not re-parented to ${parentKey}`);
+  async createChildNote({ parentKey, content, tags = [] }) {
+    if (!parentKey) {
+      throw new Error("parentKey is required");
     }
-
-    return {
+    if (!content) {
+      throw new Error("content is required");
+    }
+    return this.postBridge("/createChildNote", {
       parentKey,
-      filePath: absPath,
-      title,
-      attachmentKey: imported.attachmentKey,
-      duplicateParentKeys: imported.duplicateParentKeys,
-      result: {
-        connector: connectorResult,
-        attachmentKey: imported.attachmentKey,
-        duplicateParentKeys: imported.duplicateParentKeys,
-        verifiedParentKey: verifiedAttachment.data?.parentItem || null
-      }
-    };
+      content,
+      tags
+    }, `Failed to create child note for ${parentKey}`);
   }
 
-  connectorBaseUrl() {
-    return this.baseUrl.replace(/\/api\/?$/, "");
-  }
-
-  async saveStandaloneAttachment({ filePath, sessionID, title, url }) {
-    const metadata = JSON.stringify({ sessionID, title, url });
-    const response = await this.fetchImpl(
-      `${this.connectorBaseUrl()}/connector/saveStandaloneAttachment?sessionID=${encodeURIComponent(sessionID)}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/pdf",
-          "X-Metadata": metadata
-        },
-        body: readFileSync(filePath)
-      }
-    );
-
-    return this.parseJsonResponse(response, "Failed to save standalone attachment via Zotero connector");
-  }
-
-  async listItemsSince(version, limit = 20) {
-    const response = await this.fetchImpl(
-      `${this.baseUrl}/${this.library}s/${this.libraryId}/items?since=${version}&sort=dateAdded&direction=desc&limit=${limit}`,
-      { headers: this.headers() }
-    );
-    return this.parseJsonResponse(response, `Failed to list items since version ${version}`);
-  }
-
-  async waitForImportedAttachment({ sinceVersion, filename, sourceUrl, parentKey, parentTitle }) {
-    for (let attempt = 0; attempt < 20; attempt += 1) {
-      const items = await this.listItemsSince(sinceVersion, 25);
-      const attachment = items.find((item) => {
-        const data = item?.data || {};
-        return data.itemType === "attachment"
-          && (data.filename === filename || data.url === sourceUrl);
-      });
-
-      if (attachment) {
-        const attachmentKey = attachment.data.key;
-        const duplicateParentKeys = items
-          .filter((item) => {
-            const data = item?.data || {};
-            const attachmentHref = item?.links?.attachment?.href || "";
-            return data.itemType !== "attachment"
-              && data.key !== parentKey
-              && (
-                attachmentHref.endsWith(`/${attachmentKey}`)
-                || (parentTitle && data.title === parentTitle)
-                || data.url === sourceUrl
-              );
-          })
-          .map((item) => item.data.key);
-
-        return {
-          attachmentKey,
-          duplicateParentKeys
-        };
-      }
-
-      await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
-    }
-
-    throw new Error(`Timed out waiting for imported attachment ${filename}`);
-  }
-
-  async callMcpTool(name, args) {
-    const response = await this.fetchImpl(`${this.mcpBaseUrl}/mcp`, {
+  async postBridge(path, payload, message) {
+    const response = await this.fetchImpl(`${this.bridgeBaseUrl}${path}`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "Mcp-Session-Id": "zotero-mcp-extension"
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "tools/call",
-        params: {
-          name,
-          arguments: args
-        }
-      })
+      body: JSON.stringify(payload)
     });
-
-    const payload = await this.parseJsonResponse(response, `Failed to call MCP tool ${name}`);
-    if (payload.error) {
-      throw new Error(payload.error.message || `MCP tool ${name} failed`);
-    }
-
-    const text = payload.result?.content?.[0]?.text;
-    if (!text) {
-      return payload.result ?? null;
-    }
-
-    try {
-      return JSON.parse(text);
-    } catch {
-      return text;
-    }
-  }
-
-  async reparentAttachment(attachmentKey, parentKey) {
-    const result = await this.callMcpTool("write_item", {
-      action: "reparent",
-      parentKey,
-      attachmentKeys: [attachmentKey]
-    });
-
-    if (!result?.success || result?.data?.successCount !== 1) {
-      throw new Error(`Failed to re-parent attachment ${attachmentKey} to ${parentKey}`);
-    }
-
-    return result;
-  }
-
-  async removeItemsFromCollection(collectionKey, itemKeys) {
-    if (!itemKeys.length) {
-      return { success: true, removed: [] };
-    }
-    return this.callMcpTool("remove_items_from_collection", {
-      collectionKey,
-      itemKeys
-    });
+    return this.parseJsonResponse(response, message);
   }
 
   headers() {
@@ -329,16 +169,27 @@ export class ZoteroLocalApiClient {
 export function createService(client = new ZoteroLocalApiClient()) {
   return {
     async updateItemFields(args) {
-      const { itemKey, fields } = args || {};
+      const { itemKey, fields, creators = [] } = args || {};
       if (!itemKey) throw new Error("itemKey is required");
       if (!fields || typeof fields !== "object") throw new Error("fields is required");
-      return client.updateItemFields(itemKey, fields);
+      return client.updateItemFields(itemKey, fields, creators);
     },
     async importAttachment(args) {
       const { filePath, parentKey, title } = args || {};
       if (!filePath) throw new Error("filePath is required");
       if (!parentKey) throw new Error("parentKey is required");
       return client.importAttachment(filePath, parentKey, title);
+    },
+    async createItemWithMetadata(args) {
+      const { itemType, fields = {}, creators = [], tags = [], attachmentKeys = [] } = args || {};
+      if (!itemType) throw new Error("itemType is required");
+      return client.createItemWithMetadata({ itemType, fields, creators, tags, attachmentKeys });
+    },
+    async createChildNote(args) {
+      const { parentKey, content, tags = [] } = args || {};
+      if (!parentKey) throw new Error("parentKey is required");
+      if (!content) throw new Error("content is required");
+      return client.createChildNote({ parentKey, content, tags });
     },
     buildCitationKey,
     buildChildNoteTemplate
@@ -359,6 +210,16 @@ if (process.env.ZOTERO_MCP_EXTENSION_HTTP === "1") {
         const result = await service.importAttachment(JSON.parse(body));
         return sendJson(res, 200, result);
       }
+      if (req.method === "POST" && req.url === "/createItem") {
+        const body = await readBody(req);
+        const result = await service.createItemWithMetadata(JSON.parse(body));
+        return sendJson(res, 200, result);
+      }
+      if (req.method === "POST" && req.url === "/createChildNote") {
+        const body = await readBody(req);
+        const result = await service.createChildNote(JSON.parse(body));
+        return sendJson(res, 200, result);
+      }
       if (req.method === "GET" && req.url === "/health") {
         return sendJson(res, 200, { ok: true });
       }
@@ -370,7 +231,7 @@ if (process.env.ZOTERO_MCP_EXTENSION_HTTP === "1") {
 
   const port = Number(process.env.PORT || 23200);
   server.listen(port, "127.0.0.1", () => {
-    console.log(`zotero-mcp-extension listening on http://127.0.0.1:${port}`);
+    console.log(`zotero-bridge listening on http://127.0.0.1:${port}`);
   });
 }
 

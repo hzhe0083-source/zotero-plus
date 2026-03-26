@@ -6,20 +6,6 @@ import path from 'node:path';
 import { buildCitationKey, buildChildNoteTemplate, ensurePdfPath } from './lib.js';
 import { ZoteroPlusService } from './zotero-client.js';
 
-function makeJsonResponse(body, { status = 200, headers = {} } = {}) {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    headers: {
-      get(name) {
-        return headers[name] || headers[name.toLowerCase()] || null;
-      }
-    },
-    text: async () => JSON.stringify(body),
-    json: async () => body
-  };
-}
-
 test('buildCitationKey generates stable key', () => {
   const key = buildCitationKey({
     creators: [{ firstName: 'Bo', lastName: 'Luo', creatorType: 'author' }],
@@ -48,88 +34,27 @@ test('ensurePdfPath validates pdf files', () => {
   assert.equal(ensurePdfPath(pdfPath), pdfPath);
 });
 
-test('updateItemFields initializes MCP session and calls write_metadata', async () => {
-  const calls = [];
-  const fakeFetch = async (url, options = {}) => {
-    calls.push({ url, options });
-    const body = JSON.parse(options.body || '{}');
-
-    if (body.method === 'initialize') {
-      return makeJsonResponse(
-        {
-          jsonrpc: '2.0',
-          id: body.id,
-          result: { protocolVersion: '2024-11-05', capabilities: {}, serverInfo: { name: 'z', version: '1' } }
-        },
-        { headers: { 'Mcp-Session-Id': 'sid-1' } }
-      );
+test('updateItemFields delegates to local bridge client', async () => {
+  const fakeBridge = {
+    async updateItemFields(itemKey, fields, creators) {
+      return { itemKey, fields, creators, ok: true };
     }
-
-    if (body.method === 'notifications/initialized') {
-      return makeJsonResponse({}, { status: 202 });
-    }
-
-    if (body.method === 'tools/call') {
-      assert.equal(body.params.name, 'write_metadata');
-      assert.deepEqual(body.params.arguments, {
-        itemKey: 'ABC123',
-        fields: { title: 'New Title', date: '2024' }
-      });
-      return makeJsonResponse({
-        jsonrpc: '2.0',
-        id: body.id,
-        result: {
-          content: [{ type: 'text', text: JSON.stringify({ itemKey: 'ABC123', updated: ['title', 'date'] }) }]
-        }
-      });
-    }
-
-    throw new Error(`Unexpected request: ${body.method}`);
   };
 
-  const service = new ZoteroPlusService({ fetchImpl: fakeFetch });
+  const service = new ZoteroPlusService({ localClient: fakeBridge });
   const result = await service.updateItemFields('ABC123', { title: 'New Title', date: '2024' });
   assert.equal(result.ok, true);
-  assert.equal(calls.length, 3);
+  assert.equal(result.response.itemKey, 'ABC123');
 });
 
-test('createChildNote calls write_note with generated template', async () => {
-  const calls = [];
-  const fakeFetch = async (url, options = {}) => {
-    calls.push({ url, options });
-    const body = JSON.parse(options.body || '{}');
-
-    if (body.method === 'initialize') {
-      return makeJsonResponse(
-        {
-          jsonrpc: '2.0',
-          id: body.id,
-          result: { protocolVersion: '2024-11-05', capabilities: {}, serverInfo: { name: 'z', version: '1' } }
-        },
-        { headers: { 'Mcp-Session-Id': 'sid-2' } }
-      );
+test('createChildNote delegates to local bridge client', async () => {
+  const fakeBridge = {
+    async createChildNote({ parentKey, content, tags }) {
+      return { ok: true, parentKey, content, tags, noteKey: 'NOTE1' };
     }
-
-    if (body.method === 'notifications/initialized') {
-      return makeJsonResponse({}, { status: 202 });
-    }
-
-    if (body.method === 'tools/call') {
-      assert.equal(body.params.name, 'write_note');
-      assert.equal(body.params.arguments.action, 'create');
-      assert.equal(body.params.arguments.parentKey, 'PARENT1');
-      assert.match(body.params.arguments.content, /Citation Key:/);
-      return makeJsonResponse({
-        jsonrpc: '2.0',
-        id: body.id,
-        result: { content: [{ type: 'text', text: JSON.stringify({ noteKey: 'NOTE1' }) }] }
-      });
-    }
-
-    throw new Error(`Unexpected request: ${body.method}`);
   };
 
-  const service = new ZoteroPlusService({ fetchImpl: fakeFetch });
+  const service = new ZoteroPlusService({ localClient: fakeBridge });
   const result = await service.createChildNote({
     parentKey: 'PARENT1',
     item: {
@@ -140,7 +65,7 @@ test('createChildNote calls write_note with generated template', async () => {
   });
 
   assert.equal(result.ok, true);
-  assert.equal(calls.length, 3);
+  assert.equal(result.response.noteKey, 'NOTE1');
 });
 
 test('downloadPdf saves response body to disk', async () => {
@@ -172,4 +97,20 @@ test('importAttachment delegates to local bridge client', async () => {
   const result = await service.importAttachment({ filePath: pdfPath, parentKey: 'P1' });
   assert.equal(result.ok, true);
   assert.equal(result.attachmentKey, 'ATTACH1');
+});
+
+test('createItemWithMetadata delegates to local bridge client', async () => {
+  const fakeBridge = {
+    async createItemWithMetadata(args) {
+      return { success: true, data: { itemKey: 'ITEM1', ...args } };
+    }
+  };
+
+  const service = new ZoteroPlusService({ localClient: fakeBridge });
+  const result = await service.createItemWithMetadata({
+    itemType: 'journalArticle',
+    fields: { title: 'Visual Instruction Tuning' }
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.response.data.itemKey, 'ITEM1');
 });

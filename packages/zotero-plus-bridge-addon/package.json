@@ -1,0 +1,6 @@
+{
+  "name": "zotero-plus-bridge-addon",
+  "private": true,
+  "version": "0.2.0",
+  "description": "Zotero addon source for the Zotero Plus local HTTP bridge"
+}

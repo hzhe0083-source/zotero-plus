@@ -8,8 +8,7 @@ import { buildCitationKey, buildChildNoteTemplate, ensurePdfPath } from './lib.j
 import { ZoteroPlusService } from './zotero-client.js';
 
 const service = new ZoteroPlusService({
-  mcpUrl: process.env.ZOTERO_MCP_URL || 'http://127.0.0.1:23120/mcp',
-  downloadDir: process.env.ZOTERO_PLUS_DOWNLOAD_DIR || '/tmp/zotero-plus-downloads'
+  downloadDir: process.env.ZOTERO_PLUS_DOWNLOAD_DIR
 });
 
 const server = new Server(
@@ -20,7 +19,7 @@ const server = new Server(
 const tools = [
   {
     name: 'updateItemFields',
-    description: 'Update full Zotero metadata fields on an existing item via the running zotero-mcp HTTP server.',
+    description: 'Update Zotero metadata fields on an existing item via the Zotero Plus local bridge.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -33,7 +32,7 @@ const tools = [
   },
   {
     name: 'createItemWithMetadata',
-    description: 'Create a new Zotero item with full metadata via the running zotero-mcp HTTP server.',
+    description: 'Create a new Zotero item with full metadata via the Zotero Plus local bridge.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -48,7 +47,7 @@ const tools = [
   },
   {
     name: 'downloadPdf',
-    description: 'Download a PDF to local disk so it can be imported into Zotero manually or by a future bridge.',
+    description: 'Download a PDF to local disk so it can be imported into Zotero.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -61,7 +60,7 @@ const tools = [
   },
   {
     name: 'importAttachment',
-    description: 'Import a local PDF into Zotero and attach it to an existing item using the local connector plus re-parent workflow.',
+    description: 'Import a local PDF into Zotero and attach it to an existing item using the Zotero Plus bridge addon.',
     inputSchema: {
       type: 'object',
       properties: {

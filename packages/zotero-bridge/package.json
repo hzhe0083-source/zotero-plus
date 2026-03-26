@@ -2,7 +2,7 @@
   "name": "@zotero-plus/bridge",
   "version": "0.1.0",
   "type": "module",
-  "description": "Local bridge for Zotero local API, connector endpoints, and zotero-mcp-plugin",
+  "description": "Local bridge for Zotero local API and the Zotero Plus bridge addon",
   "main": "server/index.js",
   "exports": {
     ".": "./server/index.js"
@@ -14,4 +14,3 @@
     "node": ">=20"
   }
 }
-

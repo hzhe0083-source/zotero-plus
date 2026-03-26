@@ -12,9 +12,4 @@ Included or referenced components:
   Upstream: https://www.zotero.org/
   This repository interoperates with the Zotero local API and connector endpoints but does not bundle Zotero source code.
 
-- `zotero-mcp-plugin`
-  Upstream: https://github.com/cookjohn/zotero-mcp
-  This repository can use a running local instance of the plugin on port `23120`.
-
 If you redistribute this repository with additional bundled dependencies, review their licenses and update this file.
-
