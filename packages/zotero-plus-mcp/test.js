@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { buildCitationKey, buildChildNoteTemplate, ensurePdfPath } from './lib.js';
 import { ZoteroPlusService } from './zotero-client.js';
@@ -41,7 +42,7 @@ test('buildChildNoteTemplate contains key fields', () => {
 });
 
 test('ensurePdfPath validates pdf files', () => {
-  const tempDir = fs.mkdtempSync('/tmp/zotero-plus-test-');
+  const tempDir = fs.mkdtempSync(path.join(tmpdir(), 'zotero-plus-test-'));
   const pdfPath = path.join(tempDir, 'test.pdf');
   fs.writeFileSync(pdfPath, 'dummy');
   assert.equal(ensurePdfPath(pdfPath), pdfPath);
@@ -143,7 +144,7 @@ test('createChildNote calls write_note with generated template', async () => {
 });
 
 test('downloadPdf saves response body to disk', async () => {
-  const tempDir = fs.mkdtempSync('/tmp/zotero-plus-download-');
+  const tempDir = fs.mkdtempSync(path.join(tmpdir(), 'zotero-plus-download-'));
   const fakeFetch = async () => ({
     ok: true,
     headers: { get: () => 'application/pdf' },
@@ -157,7 +158,7 @@ test('downloadPdf saves response body to disk', async () => {
 });
 
 test('importAttachment delegates to local bridge client', async () => {
-  const tempDir = fs.mkdtempSync('/tmp/zotero-plus-import-');
+  const tempDir = fs.mkdtempSync(path.join(tmpdir(), 'zotero-plus-import-'));
   const pdfPath = path.join(tempDir, 'sample.pdf');
   fs.writeFileSync(pdfPath, 'dummy');
 
@@ -172,4 +173,3 @@ test('importAttachment delegates to local bridge client', async () => {
   assert.equal(result.ok, true);
   assert.equal(result.attachmentKey, 'ATTACH1');
 });
-

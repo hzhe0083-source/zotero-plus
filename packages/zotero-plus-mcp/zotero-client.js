@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { buildChildNoteTemplate, ensurePdfPath } from './lib.js';
 import { ZoteroLocalApiClient } from '@zotero-plus/bridge';
@@ -38,7 +39,7 @@ export class ZoteroPlusService {
   constructor({
     mcpUrl = 'http://127.0.0.1:23120/mcp',
     fetchImpl = fetch,
-    downloadDir = '/tmp/zotero-plus-downloads',
+    downloadDir = path.join(tmpdir(), 'zotero-plus-downloads'),
     localClient = null
   } = {}) {
     this.mcpUrl = mcpUrl.replace(/\/$/, '');
