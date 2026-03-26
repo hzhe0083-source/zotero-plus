@@ -37,10 +37,6 @@
 node server.js
 ```
 
-### 说明
-
-当前暴露的工具不再依赖额外的 Zotero MCP 插件，但仍然需要本地运行的 Zotero 和 Zotero Plus bridge addon。
-
 ## English
 
 A standalone MCP server for common Zotero workflows.
@@ -77,7 +73,3 @@ A standalone MCP server for common Zotero workflows.
 ```bash
 node server.js
 ```
-
-### Note
-
-This package no longer requires any separate Zotero MCP plugin for its current exposed tools, but it still requires Zotero plus the Zotero Plus bridge addon running locally.

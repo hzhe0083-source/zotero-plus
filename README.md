@@ -79,11 +79,6 @@ curl http://127.0.0.1:23121/health
 npm test
 ```
 
-### 备注
-
-- 仓库只包含原创集成代码，不打包 Zotero 官方源码。
-- 真实写操作仍然需要本地运行的 Zotero 环境。
-
 ### 别人能不能直接用
 
 大体可以，但不是零配置。
@@ -184,11 +179,6 @@ curl http://127.0.0.1:23121/health
 ```bash
 npm test
 ```
-
-### Notes
-
-- This repository contains original integration code. It does not bundle Zotero source code.
-- Real write operations require a running local Zotero environment.
 
 ### Can Others Use It Directly?
 
