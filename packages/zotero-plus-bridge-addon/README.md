@@ -33,7 +33,7 @@ npm run build
 2. 产物位置：
 
 ```text
-release/zotero-plus-bridge-0.2.1.xpi
+release/zotero-plus-bridge-0.2.2.xpi
 ```
 
 3. 在 Zotero 中安装这个 `.xpi`
@@ -73,7 +73,7 @@ npm run build
 2. The built artifact will be placed at:
 
 ```text
-release/zotero-plus-bridge-0.2.1.xpi
+release/zotero-plus-bridge-0.2.2.xpi
 ```
 
 3. Install the `.xpi` into Zotero as an addon

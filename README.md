@@ -59,7 +59,7 @@ npm run build:addon
 2. 构建后会生成：
 
 ```text
-packages/zotero-plus-bridge-addon/release/zotero-plus-bridge-0.2.1.xpi
+packages/zotero-plus-bridge-addon/release/zotero-plus-bridge-0.2.2.xpi
 ```
 
 3. 在 Zotero 中打开：
@@ -138,7 +138,7 @@ npm run build:addon
 2. This generates:
 
 ```text
-packages/zotero-plus-bridge-addon/release/zotero-plus-bridge-0.2.1.xpi
+packages/zotero-plus-bridge-addon/release/zotero-plus-bridge-0.2.2.xpi
 ```
 
 3. In Zotero:
