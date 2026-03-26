@@ -79,28 +79,6 @@ curl http://127.0.0.1:23121/health
 npm test
 ```
 
-### 别人能不能直接用
-
-大体可以，但不是零配置。
-
-现在已经可移植的部分：
-
-- 仓库里没有硬编码 `/home/ryan/...` 源码路径
-- 默认下载目录使用当前平台的临时目录
-- 仓库可以直接 `npm install && npm test`
-
-别人本地仍然需要：
-
-- Zotero
-- Zotero local API
-- Zotero Plus bridge addon
-
-也就是说：
-
-- 代码路径层面已经基本可移植
-- 运行层面仍然需要本地 Zotero 环境
-- 现在已经更接近“Zotero + Zotero Plus”
-
 ## English
 
 Zotero-Plus is a small MCP-oriented toolkit for Zotero ingestion and metadata workflows.
@@ -179,19 +157,3 @@ curl http://127.0.0.1:23121/health
 ```bash
 npm test
 ```
-
-### Can Others Use It Directly?
-
-Mostly yes, but not with zero setup.
-
-Portable now:
-
-- No hard-coded `/home/ryan/...` imports remain in the repository
-- Default download directory uses the platform temp directory
-- The repo installs and tests cleanly with `npm install && npm test`
-
-Still required locally:
-
-- Zotero
-- Zotero local API
-- Zotero Plus bridge addon
